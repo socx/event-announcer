@@ -1,0 +1,27 @@
+{
+  "name": "event-announcer",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/socx/event-announcer.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/socx/event-announcer/issues"
+  },
+  "homepage": "https://github.com/socx/event-announcer#readme",
+  "description": "",
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "csv-parser": "^3.2.0",
+    "dayjs": "^1.11.13",
+    "node-cron": "^4.1.0",
+    "ora": "^8.2.0",
+    "spinner": "^0.2.4"
+  }
+}

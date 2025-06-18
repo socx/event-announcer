@@ -12,6 +12,12 @@ import nodeCron from 'node-cron';
 import ora from 'ora';
 import fs from 'fs';
 import csvParser from 'csv-parser';
+import nodemailer from 'nodemailer';
+import dotenv from 'dotenv';
+
+
+dotenv.config();
+
 import dayjs from 'dayjs';
 import advancedFormat from 'dayjs/plugin/advancedFormat.js';
 
@@ -20,14 +26,28 @@ import advancedFormat from 'dayjs/plugin/advancedFormat.js';
 dayjs.extend(advancedFormat);
 
 // Define the messages to be sent
-const BIRTHDAY_NOTICE_MESSAGE = `Hello [[RECIPIENT_FIRSTNAME]], tomorrow, [[BIRTH_DATE]] is [[BIRTH_DAY_CELEBRANT]]'s birthday!`;
-const ANNIVERSARY_NOTICE_MESSAGE = `Hello [[RECIPIENT_FIRSTNAME]], tomorrow, [[ANNIVERSARY_DATE]] is [[ANNIVERSARY_CELEBRANT]]'s wedding anniversary!`;
-
+const ANNIVERSARY_NOTICE_MESSAGE = `<div>
+  <h1>ANNIVERSARY REMINDER 🎊</h1>
+  <p>Hi [[RECIPIENT_FIRSTNAME]], 👋🏽</p>
+  <p>This is a friendly wedding anniversary reminder.</p>
+  <p>Today, <b>[[ANNIVERSARY_DATE]]</b> is <b><i>[[ANNIVERSARY_CELEBRANT]]'s</i></b> wedding anniversary!🎊</p>
+  <p>Best regards,</p>
+  <p>[[APP_NAME]] Team</p>
+</div>`;
+const BIRTHDAY_NOTICE_MESSAGE = `<div>
+  <h1>BIRTHDAY REMINDER 🎉</h1>
+  <p>Hi [[RECIPIENT_FIRSTNAME]], 👋🏽</p>
+  <p>This is a friendly birthday reminder.</p>
+  <p>Today, <b>[[BIRTH_DATE]]</b> is <b><i>[[BIRTH_DAY_CELEBRANT]]'s</i></b> birthday!🎉</p>
+  <p>Best regards,</p>
+  <p>[[APP_NAME]] Team</p>
+</div>`;
 
 // Function to read family members data from CSV
 async function readFamilyMembersFromCSV(filePath) {
   const familyMembers = [];
 
+  // id,firstname,middlename,lastname,birthDate,gender,parents,weddingDate,spouses,deathDate
   try {
     const readStream = fs.createReadStream(filePath);
     await new Promise((resolve, reject) => {
@@ -40,10 +60,11 @@ async function readFamilyMembersFromCSV(filePath) {
             middlename: row.middlename,
             lastname: row.lastname,
             birthDate: new Date(row.birthDate),
+            gender: row.gender,
+            parents: row.parents,
             weddingDate: new Date(row.weddingDate),
-            parent1: row.parent1,
-            parent2: row.parent2,
             spouses: row.spouses,
+            deathDate: row.deathDate,
           });
         })
         .on('end', () => {
@@ -96,6 +117,29 @@ async function readRecipientsFromCSV(filePath) {
   return recipients;
 }
 
+async function sendEmail(to, subject, html) {
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT, 10),
+    secure: true, // Use SSL
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASSWORD,
+    },
+  });
+
+  try {
+    await transporter.sendMail({
+      from: `Socx Event Announcer ${process.env.SMTP_USER}`,
+      to,
+      subject,
+      html,
+    });
+    console.log(chalk.green(`Email sent successfully to ${to}`));
+  } catch (error) {
+    console.error(chalk.red(`Failed to send email to ${to}:`), error);
+  }
+}
 
 async function sendMessages() {
   console.log();
@@ -117,29 +161,28 @@ async function sendMessages() {
     spinner.text = "Reading recipients from CSV file... ";
     spinner.render();
     const familyMembers = await readFamilyMembersFromCSV('./family_members.csv');
-    const tomorrow = dayjs().add(1, 'day').toDate();
+    const today = dayjs().toDate();
     spinner.succeed(`Fetched ${familyMembers.length} family members successfully.`);
 
     const birthdayCelebrants = familyMembers.filter(
       (member) =>
-        member.birthDate.getDate() === tomorrow.getDate() &&
-        member.birthDate.getMonth() === tomorrow.getMonth()
+        member.birthDate.getDate() === today.getDate() &&
+        member.birthDate.getMonth() === today.getMonth()
     );
 
     const anniversaryCelebrants = familyMembers.filter(
       (member) =>
-        member.weddingDate.getDate() === tomorrow.getDate() &&
-        member.weddingDate.getMonth() === tomorrow.getMonth()
+        member.weddingDate.getDate() === today.getDate() &&
+        member.weddingDate.getMonth() === today.getMonth()
     );
 
-    spinner.succeed(`Filtered ${anniversaryCelebrants.length} anniversaryCelebrants for tomorrow.`);
+    spinner.succeed(`Filtered ${anniversaryCelebrants.length} anniversaryCelebrants for today.`);
     console.log(chalk.blue.bold(`anniversary Celebrants: ${anniversaryCelebrants.map((c) => `${c.firstname} ${c.lastname}`).join(', ')}`));
 
-    spinner.succeed(`Filtered ${birthdayCelebrants.length} birthdayCelebrants for tomorrow.`);
+    spinner.succeed(`Filtered ${birthdayCelebrants.length} birthdayCelebrants for today.`);
     console.log(chalk.blue.bold(`Birthday Celebrants: ${birthdayCelebrants.map((c) => `${c.firstname} ${c.lastname}`).join(', ')}`));
     console.log();
 
-    // Read recipients from CSV file
     spinner.text = "Reading recipients from CSV file... ";
     spinner.render();
     const recipients = await readRecipientsFromCSV('./recipients.csv');
@@ -147,29 +190,33 @@ async function sendMessages() {
     console.log(chalk.blue.bold(`Recipients: ${recipients.map((r) => r.firstname).join(', ')}`));
     console.log();
 
-    // Loop through the recipients and send messages
+
     for (const recipient of recipients) {
-      // Send birthday notice message
       for (const birthdayCelebrant of birthdayCelebrants) {
         spinner.text = `Sending message to ${recipient.firstname} about ${birthdayCelebrant.firstname} ${birthdayCelebrant.lastname}... `;
         spinner.render();
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+
         const birthDayMessage = BIRTHDAY_NOTICE_MESSAGE.replace('[[RECIPIENT_FIRSTNAME]]', recipient.firstname)
           .replace('[[BIRTH_DAY_CELEBRANT]]', `${birthdayCelebrant.firstname} ${birthdayCelebrant.lastname}`)
-          .replace('[[BIRTH_DATE]]', `${dayjs(birthdayCelebrant.birthDate).format('Do MMM')}`);
+          .replace('[[BIRTH_DATE]]', `${dayjs(birthdayCelebrant.birthDate).format('dddd, Do MMMM')}`)
+          .replace('[[APP_NAME]]', `${process.env.APP_NAME || 'Event Announcer'}`);
+        
+        await sendEmail(recipient.email, "Birthday Reminder", birthDayMessage);
+
         console.log(chalk.green(`Birthday reminder sent: ${birthDayMessage}`));
        
         spinner.succeed(`Message(s) sent successfully to ${recipient.firstname} in ${Date.now() - date}ms`);
       }
 
-      // Send wedding anniversary notice message
       for (const anniversaryCelebrant of anniversaryCelebrants) {
         spinner.text = `Sending message to ${recipient.firstname} about ${anniversaryCelebrant.firstname} ${anniversaryCelebrant.lastname}... `;
         spinner.render();
         await new Promise((resolve) => setTimeout(resolve, 2000));
         const anniversaryMessage = ANNIVERSARY_NOTICE_MESSAGE.replace('[[RECIPIENT_FIRSTNAME]]', recipient.firstname)
           .replace('[[ANNIVERSARY_CELEBRANT]]', `${anniversaryCelebrant.firstname} ${anniversaryCelebrant.lastname}`)
-          .replace('[[ANNIVERSARY_DATE]]', `${dayjs(anniversaryCelebrant.weddingDate).format('Do MMM')}`);
+          .replace('[[ANNIVERSARY_DATE]]', `${dayjs(anniversaryCelebrant.weddingDate).format('dddd, Do MMMM')}`);
+        
+        await sendEmail(recipient.email, "Wedding Anniversary Reminder", anniversaryMessage);
         console.log(chalk.green(`Wedding anniversary reminder sent: ${anniversaryMessage}`));
        
         spinner.succeed(`Message(s) sent successfully to ${recipient.firstname} in ${Date.now() - date}ms`);
@@ -182,14 +229,12 @@ async function sendMessages() {
     );
 
   } catch (error) {
-    // Print failed on the terminal if process is unsuccessful
     spinner.fail({ text: "Sending Message failed" });
-    // Remove the spinner from the terminal
     spinner.clear();
-    // Print the error message on the terminal
     console.log(error);
   }
 };
 
-// Schedule a job to run every two minutes
-const job = nodeCron.schedule("*/1 * * * *", sendMessages);
+// Schedule a job to run
+// const job = nodeCron.schedule("*/1 * * * *", sendMessages);
+const job = nodeCron.schedule("0 2 * * *", sendMessages);

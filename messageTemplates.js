@@ -16,3 +16,6 @@ export const BIRTHDAY_REMINDER_EMAIL_MESSAGE = `<div>
   <p>Best regards,</p>
   <p>[[APP_NAME]] Team</p>
 </div>`;
+
+export const BIRTHDAY_REMINDER_WHATSAPP_MESSAGE = `Hi [[RECIPIENT_FIRSTNAME]], it is [[BIRTH_DAY_CELEBRANT]]'s birthday today! 🎉`;
+export const ANNIVERSARY_REMINDER_WHATSAPP_MESSAGE = `Hi [[RECIPIENT_FIRSTNAME]], it is [[ANNIVERSARY_CELEBRANT]]'s wedding anniversary today!🎊`;

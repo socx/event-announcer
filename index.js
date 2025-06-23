@@ -8,6 +8,7 @@
 
 
 import advancedFormat from 'dayjs/plugin/advancedFormat.js';
+import axios from 'axios';
 import chalk from 'chalk';
 import csvParser from 'csv-parser';
 import dayjs from 'dayjs';
@@ -17,9 +18,12 @@ import nodeCron from 'node-cron';
 import nodemailer from 'nodemailer';
 import ora from 'ora';
 
+import { WHATSAPP_BUSINESS_API_ENDPOINT } from './constants.js';
 import {
   ANNIVERSARY_REMINDER_EMAIL_MESSAGE,
+  ANNIVERSARY_REMINDER_WHATSAPP_MESSAGE,
   BIRTHDAY_REMINDER_EMAIL_MESSAGE,
+  BIRTHDAY_REMINDER_WHATSAPP_MESSAGE,
 } from './messageTemplates.js';
 
 // Load environment variables from .env file
@@ -129,6 +133,46 @@ async function sendEmail(to, subject, html) {
   }
 }
 
+// Send a WhatsApp message
+async function sendWhatsAppMessage(recipientPhone, messageText) {
+  if (!process.env.WHATSAPP_TOKEN || !process.env.PHONE_NUMBER_ID) {
+    console.error(chalk.red('Missing WhatsApp API credentials.'));
+    return;
+  }
+  if (!recipientPhone || !messageText) {
+    console.error(chalk.red('Missing recipient phone number or message text.'));
+    return;
+  }
+  // Validate phone number format (E.164 format)
+  const phoneRegex = /^\+\d{1,3}\d{1,14}$/; // E.164 format
+  if (!phoneRegex.test(recipientPhone)) {
+    console.error(chalk.red(`Invalid phone number format: ${recipientPhone}. Please use E.164 format (e.g., +1234567890).`));
+    return;
+  }
+  const url = `${WHATSAPP_BUSINESS_API_ENDPOINT}/${process.env.PHONE_NUMBER_ID}/messages`;
+
+  const headers = {
+    'Authorization': `Bearer ${process.env.WHATSAPP_TOKEN}`,
+    'Content-Type': 'application/json'
+  };
+
+  const data = {
+    messaging_product: 'whatsapp',
+    to: recipientPhone,
+    type: 'text',
+    text: {
+      body: messageText
+    }
+  };
+
+  try {
+    const response = await axios.post(url, data, { headers });
+    console.log('WhatsApp message sent:', response.data);
+  } catch (error) {
+    console.error('Error sending WhatsApp message:', error.response?.data || error.message);
+  }
+}
+
 async function sendMessages() {
   console.log();
   console.log(chalk.green("Running scheduled job"));
@@ -199,6 +243,13 @@ async function sendMessages() {
           .replace('[[APP_NAME]]', `${process.env.APP_NAME || 'Event Announcer'}`);
         await sendEmail(recipient.email, "Birthday Reminder", birthDayMessageEmail);
         console.log(chalk.green(`Email birthday reminder sent: ${birthDayMessageEmail}`));
+
+        // Send birthday WhatsApp message
+        const birthDayMessageWhatsApp = BIRTHDAY_REMINDER_WHATSAPP_MESSAGE.replace('[[RECIPIENT_FIRSTNAME]]', recipient.firstname)
+          .replace('[[BIRTH_DAY_CELEBRANT]]', `${birthdayCelebrant.firstname} ${birthdayCelebrant.lastname}`)
+          .replace('[[BIRTH_DATE]]', `${dayjs(birthdayCelebrant.birthDate).format('dddd, Do MMMM')}`);
+        await sendWhatsAppMessage(recipient.mobileNo, birthDayMessageWhatsApp);
+        console.log(chalk.green(`WhatsApp birthday reminder sent: ${birthDayMessageWhatsApp}`));
        
         spinner.succeed(`Message(s) sent successfully to ${recipient.firstname} in ${Date.now() - date}ms`);
       }
@@ -221,8 +272,15 @@ async function sendMessages() {
           .replace('[[ANNIVERSARY_CELEBRANT]]', `${anniversaryCelebrant.firstname} ${anniversaryCelebrant.lastname}`)
           .replace('[[ANNIVERSARY_DATE]]', `${dayjs(anniversaryCelebrant.weddingDate).format('dddd, Do MMMM')}`)
           .replace('[[APP_NAME]]', `${process.env.APP_NAME || 'Event Announcer'}`);
-        await sendEmail(recipient.email, "Birthday Reminder", anniversaryMessageEmail);
-        console.log(chalk.green(`Email birthday reminder sent: ${anniversaryMessageEmail}`));
+        await sendEmail(recipient.email, "Anniversary Reminder", anniversaryMessageEmail);
+        console.log(chalk.green(`Email wedding anniversary reminder sent: ${anniversaryMessageEmail}`));
+
+        // Send anniversary WhatsApp message
+        const anniversaryMessageWhatsApp = ANNIVERSARY_REMINDER_WHATSAPP_MESSAGE.replace('[[RECIPIENT_FIRSTNAME]]', recipient.firstname)
+          .replace('[[ANNIVERSARY_CELEBRANT]]', `${anniversaryCelebrant.firstname} ${anniversaryCelebrant.lastname}`)
+          .replace('[[ANNIVERSARY_DATE]]', `${dayjs(anniversaryCelebrant.weddingDate).format('dddd, Do MMMM')}`);
+        await sendWhatsAppMessage(recipient.mobileNo, anniversaryMessageWhatsApp);
+        console.log(chalk.green(`WhatsApp wedding anniversary reminder sent: ${anniversaryMessageWhatsApp}`));
       
         spinner.succeed(`Message(s) sent successfully to ${recipient.firstname} in ${Date.now() - date}ms`);
         
@@ -242,4 +300,5 @@ async function sendMessages() {
 };
 
 // Schedule a job to run
-const job = nodeCron.schedule("0 2 * * *", sendMessages);
+const job = nodeCron.schedule("*/1 * * * *", sendMessages);
+// const job = nodeCron.schedule("0 2 * * *", sendMessages);

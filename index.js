@@ -300,5 +300,4 @@ async function sendMessages() {
 };
 
 // Schedule a job to run
-const job = nodeCron.schedule("*/1 * * * *", sendMessages);
-// const job = nodeCron.schedule("0 2 * * *", sendMessages);
+const job = nodeCron.schedule("0 2 * * *", sendMessages);

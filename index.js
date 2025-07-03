@@ -137,20 +137,24 @@ function getTodayCelebrants(familyMembers) {
 /**
  * Sends celebrant reminder emails to recipients.
  * 
- * @param {Array} recipients - List of recipients with `firstname` and `email` fields.
- * @param {Array} birthdays - List of birthday celebrants with `firstname` and `lastname` fields.
- * @param {Array} anniversaries - List of anniversary celebrants with `firstname` and `lastname` fields.
+ * @param {Array} recipients - List of recipients.
+ * @param {Array} birthdays - List of birthdays celebrants.
+ * @param {Array} anniversaries - List of anniversary celebrants.
  */
 async function sendCelebrantReminderEmails(recipients, birthdays, anniversaries) {
   for (const recipient of recipients) {
     // Format the list of birthday celebrants
     const birthdayCelebrants = birthdays.map(
-      (b) => `${b.firstname} ${b.lastname}`
+      (b) => b.id == recipient.familyId ? 'Yourself' : `${b.firstname} ${b.lastname}`
     ).join(', ') || 'None';
 
     // Format the list of anniversary celebrants
     const anniversaryCelebrants = anniversaries.map(
-      (a) => `${a.firstname} ${a.lastname}`
+      (a) => {
+        if (a.id === recipient.familyId) { return 'Yourself'; }
+        if (a.spouses && a.spouses.includes(recipient.familyId)) { return 'Your spouse'; }
+        return `${a.firstname} ${a.lastname}`;
+      }
     ).join(', ') || 'None';
 
     // Replace placeholders in the email template
@@ -262,8 +266,8 @@ async function sendMessages() {
     const familyMembers = await readFamilyMembersFromCSV('./family_members.csv');
     const { birthdays, anniversaries } = getTodayCelebrants(familyMembers);
     spinner.succeed(`Fetched ${birthdays.length + anniversaries.length} celebrants successfully.`);
-    console.log(chalk.blueBright.bold('Today\'s Birthdays:', birthdays.map((b) => `${b.firstname} ${b.lastname}`)));
-    console.log(chalk.greenBright.bold('Today\'s Anniversaries:', anniversaries.map((a) => `${a.firstname} ${a.lastname}`)));
+    console.log(chalk.cyanBright.bold('Today\'s Birthdays:', birthdays.map((b) => `${b.firstname} ${b.lastname}`)));
+    console.log(chalk.cyanBright.bold('Today\'s Anniversaries:', anniversaries.map((a) => `${a.firstname} ${a.lastname}`)));
     console.log();
 
     await sendCelebrantReminderEmails(recipients, birthdays, anniversaries);
@@ -281,4 +285,4 @@ async function sendMessages() {
 };
 
 // Schedule a job to run
-const job = nodeCron.schedule("0 2 * * *", sendMessages);
+const job = nodeCron.schedule("*/1 * * * *", sendMessages);

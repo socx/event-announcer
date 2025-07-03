@@ -20,10 +20,7 @@ import ora from 'ora';
 
 import { WHATSAPP_BUSINESS_API_ENDPOINT } from './constants.js';
 import {
-  ANNIVERSARY_REMINDER_EMAIL_MESSAGE,
-  ANNIVERSARY_REMINDER_WHATSAPP_MESSAGE,
-  BIRTHDAY_REMINDER_EMAIL_MESSAGE,
-  BIRTHDAY_REMINDER_WHATSAPP_MESSAGE,
+  CELEBRANT_REMINDER_EMAIL_MESSAGE,
 } from './messageTemplates.js';
 
 // Load environment variables from .env file
@@ -108,6 +105,71 @@ async function readRecipientsFromCSV(filePath) {
   return recipients;
 }
 
+/**
+ * Filters family members to find those with birthdays or wedding anniversaries
+ * that match today's day and month.
+ * 
+ * @param {Array} familyMembers - List of family members with birthDate and weddingDate fields.
+ * @returns {Object} - An object containing two arrays: birthdays and anniversaries.
+ */
+function getTodayCelebrants(familyMembers) {
+  const today = dayjs(); // Get today's date
+  const todayDay = today.date(); // Day of the month
+  const todayMonth = today.month(); // Month (0-indexed)
+
+  const birthdays = familyMembers.filter(
+    (member) =>
+      member.birthDate &&
+      dayjs(member.birthDate).date() === todayDay &&
+      dayjs(member.birthDate).month() === todayMonth
+  );
+
+  const anniversaries = familyMembers.filter(
+    (member) =>
+      member.weddingDate &&
+      dayjs(member.weddingDate).date() === todayDay &&
+      dayjs(member.weddingDate).month() === todayMonth
+  );
+
+  return { birthdays, anniversaries };
+}
+
+/**
+ * Sends celebrant reminder emails to recipients.
+ * 
+ * @param {Array} recipients - List of recipients with `firstname` and `email` fields.
+ * @param {Array} birthdays - List of birthday celebrants with `firstname` and `lastname` fields.
+ * @param {Array} anniversaries - List of anniversary celebrants with `firstname` and `lastname` fields.
+ */
+async function sendCelebrantReminderEmails(recipients, birthdays, anniversaries) {
+  for (const recipient of recipients) {
+    // Format the list of birthday celebrants
+    const birthdayCelebrants = birthdays.map(
+      (b) => `${b.firstname} ${b.lastname}`
+    ).join(', ') || 'None';
+
+    // Format the list of anniversary celebrants
+    const anniversaryCelebrants = anniversaries.map(
+      (a) => `${a.firstname} ${a.lastname}`
+    ).join(', ') || 'None';
+
+    // Replace placeholders in the email template
+    const emailMessage = CELEBRANT_REMINDER_EMAIL_MESSAGE
+      .replace('[[RECIPIENT_FIRSTNAME]]', recipient.firstname)
+      .replace('[[BIRTHDAY_CELEBRANTS]]', birthdayCelebrants)
+      .replace('[[ANNIVERSARY_CELEBRANTS]]', anniversaryCelebrants)
+      .replace('[[APP_NAME]]', process.env.APP_NAME || 'Event Announcer');
+
+    // Send the email
+    try {
+      await sendEmail(recipient.email, "Today's Celebrations Reminder 🎉", emailMessage);
+      console.log(chalk.green(`Celebrant reminder email sent to ${recipient.firstname} (${recipient.email})`));
+    } catch (error) {
+      console.error(chalk.red(`Failed to send celebrant reminder email to ${recipient.firstname} (${recipient.email}):`), error);
+    }
+  }
+}
+
 // Send an email using nodemailer
 async function sendEmail(to, subject, html) {
   const transporter = nodemailer.createTransport({
@@ -186,33 +248,6 @@ async function sendMessages() {
   
   
   try {
-    const date = Date.now();
-    console.log();
-
-    // Read recipients from CSV file
-    spinner.text = "Reading recipients from CSV file... ";
-    spinner.render();
-    const familyMembers = await readFamilyMembersFromCSV('./family_members.csv');
-    const today = dayjs().toDate();
-    spinner.succeed(`Fetched ${familyMembers.length} family members successfully.`);
-
-    const birthdayCelebrants = familyMembers.filter(
-      (member) =>
-        member.birthDate.getDate() === today.getDate() &&
-        member.birthDate.getMonth() === today.getMonth()
-    );
-
-    const anniversaryCelebrants = familyMembers.filter(
-      (member) =>
-        member.weddingDate.getDate() === today.getDate() &&
-        member.weddingDate.getMonth() === today.getMonth()
-    );
-
-    spinner.succeed(`Filtered ${anniversaryCelebrants.length} anniversaryCelebrants for today.`);
-    console.log(chalk.blue.bold(`anniversary Celebrants: ${anniversaryCelebrants.map((c) => `${c.firstname} ${c.lastname}`).join(', ')}`));
-
-    spinner.succeed(`Filtered ${birthdayCelebrants.length} birthdayCelebrants for today.`);
-    console.log(chalk.blue.bold(`Birthday Celebrants: ${birthdayCelebrants.map((c) => `${c.firstname} ${c.lastname}`).join(', ')}`));
     console.log();
 
     spinner.text = "Reading recipients from CSV file... ";
@@ -222,70 +257,16 @@ async function sendMessages() {
     console.log(chalk.blue.bold(`Recipients: ${recipients.map((r) => r.firstname).join(', ')}`));
     console.log();
 
-    // Check if there are any birthday or anniversary celebrants
-    for (const recipient of recipients) {
+    spinner.text = "Reading celebrants from CSV file... ";
+    spinner.render();
+    const familyMembers = await readFamilyMembersFromCSV('./family_members.csv');
+    const { birthdays, anniversaries } = getTodayCelebrants(familyMembers);
+    spinner.succeed(`Fetched ${birthdays.length + anniversaries.length} celebrants successfully.`);
+    console.log(chalk.blueBright.bold('Today\'s Birthdays:', birthdays.map((b) => `${b.firstname} ${b.lastname}`)));
+    console.log(chalk.greenBright.bold('Today\'s Anniversaries:', anniversaries.map((a) => `${a.firstname} ${a.lastname}`)));
+    console.log();
 
-      // Sending birthday reminder messages
-      for (const birthdayCelebrant of birthdayCelebrants) {
-        spinner.text = `Sending message to ${recipient.firstname} about ${birthdayCelebrant.firstname} ${birthdayCelebrant.lastname}... `;
-        spinner.render();
-
-        // Check if the recipient is the celebrant
-        const isCelebrant = recipient.familyId === birthdayCelebrant.id;
-        if (isCelebrant) {
-          console.log(chalk.blue.bold(`${recipient.firstname} is the celebrant, skipping message`));
-          continue;
-        }
-        // Send birthday email message
-        const birthDayMessageEmail = BIRTHDAY_REMINDER_EMAIL_MESSAGE.replace('[[RECIPIENT_FIRSTNAME]]', recipient.firstname)
-          .replace('[[BIRTH_DAY_CELEBRANT]]', `${birthdayCelebrant.firstname} ${birthdayCelebrant.lastname}`)
-          .replace('[[BIRTH_DATE]]', `${dayjs(birthdayCelebrant.birthDate).format('dddd, Do MMMM')}`)
-          .replace('[[APP_NAME]]', `${process.env.APP_NAME || 'Event Announcer'}`);
-        await sendEmail(recipient.email, "Birthday Reminder", birthDayMessageEmail);
-        console.log(chalk.green(`Email birthday reminder sent: ${birthDayMessageEmail}`));
-
-        // Send birthday WhatsApp message
-        const birthDayMessageWhatsApp = BIRTHDAY_REMINDER_WHATSAPP_MESSAGE.replace('[[RECIPIENT_FIRSTNAME]]', recipient.firstname)
-          .replace('[[BIRTH_DAY_CELEBRANT]]', `${birthdayCelebrant.firstname} ${birthdayCelebrant.lastname}`)
-          .replace('[[BIRTH_DATE]]', `${dayjs(birthdayCelebrant.birthDate).format('dddd, Do MMMM')}`);
-        await sendWhatsAppMessage(recipient.mobileNo, birthDayMessageWhatsApp);
-        console.log(chalk.green(`WhatsApp birthday reminder sent: ${birthDayMessageWhatsApp}`));
-       
-        spinner.succeed(`Message(s) sent successfully to ${recipient.firstname} in ${Date.now() - date}ms`);
-      }
-
-      // Sending wedding anniversary reminder messages
-      for (const anniversaryCelebrant of anniversaryCelebrants) {
-        spinner.text = `Sending message to ${recipient.firstname} about ${anniversaryCelebrant.firstname} ${anniversaryCelebrant.lastname}... `;
-        spinner.render();
-        // Check if the recipient is a spouse or the celebrant
-        // If the recipient is a spouse or the celebrant, skip sending the message
-        const isSpouse = anniversaryCelebrant.spouses && anniversaryCelebrant.spouses.includes(recipient.familyId);
-        const isCelebrant = recipient.familyId === anniversaryCelebrant.id;
-        if (isSpouse || isCelebrant) {
-          console.log(chalk.blue.bold(`${recipient.firstname} is a either the celebrant or the spouse of the celebrant`));
-          continue;
-        }
-
-        // Send anniversary email message
-        const anniversaryMessageEmail = ANNIVERSARY_REMINDER_EMAIL_MESSAGE.replace('[[RECIPIENT_FIRSTNAME]]', recipient.firstname)
-          .replace('[[ANNIVERSARY_CELEBRANT]]', `${anniversaryCelebrant.firstname} ${anniversaryCelebrant.lastname}`)
-          .replace('[[ANNIVERSARY_DATE]]', `${dayjs(anniversaryCelebrant.weddingDate).format('dddd, Do MMMM')}`)
-          .replace('[[APP_NAME]]', `${process.env.APP_NAME || 'Event Announcer'}`);
-        await sendEmail(recipient.email, "Anniversary Reminder", anniversaryMessageEmail);
-        console.log(chalk.green(`Email wedding anniversary reminder sent: ${anniversaryMessageEmail}`));
-
-        // Send anniversary WhatsApp message
-        const anniversaryMessageWhatsApp = ANNIVERSARY_REMINDER_WHATSAPP_MESSAGE.replace('[[RECIPIENT_FIRSTNAME]]', recipient.firstname)
-          .replace('[[ANNIVERSARY_CELEBRANT]]', `${anniversaryCelebrant.firstname} ${anniversaryCelebrant.lastname}`)
-          .replace('[[ANNIVERSARY_DATE]]', `${dayjs(anniversaryCelebrant.weddingDate).format('dddd, Do MMMM')}`);
-        await sendWhatsAppMessage(recipient.mobileNo, anniversaryMessageWhatsApp);
-        console.log(chalk.green(`WhatsApp wedding anniversary reminder sent: ${anniversaryMessageWhatsApp}`));
-      
-        spinner.succeed(`Message(s) sent successfully to ${recipient.firstname} in ${Date.now() - date}ms`);
-        
-      }
-    }
+    await sendCelebrantReminderEmails(recipients, birthdays, anniversaries);
     
     console.log(
       chalk.yellow.bold(`ALL DONE at : `),

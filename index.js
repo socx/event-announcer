@@ -142,6 +142,14 @@ function getTodayCelebrants(familyMembers) {
  * @param {Array} anniversaries - List of anniversary celebrants.
  */
 async function sendCelebrantReminderEmails(recipients, birthdays, anniversaries) {
+  if (birthdays.length === 0 && anniversaries.length === 0) {
+    console.log(chalk.yellow('No celebrants found for today.'));
+    return;
+  }
+  if (recipients.length === 0) {
+    console.log(chalk.yellow('No recipients found to send celebrant reminders.'));
+    return;
+  }
   for (const recipient of recipients) {
     // Format the list of birthday celebrants
     const birthdayCelebrants = birthdays.map(
@@ -285,4 +293,4 @@ async function sendMessages() {
 };
 
 // Schedule a job to run
-const job = nodeCron.schedule("*/1 * * * *", sendMessages);
+const job = nodeCron.schedule("0 2 * * *", sendMessages);

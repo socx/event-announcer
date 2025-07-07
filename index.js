@@ -171,6 +171,33 @@ function getWeekCelebrants(familyMembers) {
   return { birthdays, anniversaries };
 }
 
+/**
+ * Filters family members to find those with birthdays or wedding anniversaries
+ * that fall within the current month.
+ * 
+ * @param {Array} familyMembers - List of family members with `birthDate` and `weddingDate` fields.
+ * @returns {Object} - An object containing two arrays: `birthdays` and `anniversaries` for the current month.
+ */
+function getMonthCelebrants(familyMembers) {
+  const today = dayjs(); // Get today's date
+  const currentMonth = today.month(); // Get the current month (0-indexed)
+
+  // Filter birthdays that fall within the current month
+  const birthdays = familyMembers.filter((member) => {
+    if (!member.birthDate) return false;
+    const birthDate = dayjs(member.birthDate);
+    return birthDate.month() === currentMonth; // Ensure the month matches
+  });
+
+  // Filter anniversaries that fall within the current month
+  const anniversaries = familyMembers.filter((member) => {
+    if (!member.weddingDate) return false;
+    const weddingDate = dayjs(member.weddingDate);
+    return weddingDate.month() === currentMonth; // Ensure the month matches
+  });
+
+  return { birthdays, anniversaries };
+}
 
 /**
  * Sends celebrant reminder emails to recipients.

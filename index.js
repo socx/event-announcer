@@ -135,6 +135,44 @@ function getTodayCelebrants(familyMembers) {
 }
 
 /**
+ * Filters family members to find those with birthdays or wedding anniversaries
+ * that fall within the current week (Sunday to Saturday).
+ * 
+ * @param {Array} familyMembers - List of family members with `birthDate` and `weddingDate` fields.
+ * @returns {Object} - An object containing two arrays: `birthdays` and `anniversaries` for the current week.
+ */
+function getWeekCelebrants(familyMembers) {
+  const today = dayjs(); // Get today's date
+  const startOfWeek = today.startOf('week'); // Start of the current week (Sunday)
+  const endOfWeek = today.endOf('week'); // End of the current week (Saturday)
+
+  // Filter birthdays that fall within the current week
+  const birthdays = familyMembers.filter((member) => {
+    if (!member.birthDate) return false;
+    const birthDate = dayjs(member.birthDate);
+    return (
+      birthDate.month() === today.month() && // Ensure the month matches
+      birthDate.date() >= startOfWeek.date() &&
+      birthDate.date() <= endOfWeek.date()
+    );
+  });
+
+  // Filter anniversaries that fall within the current week
+  const anniversaries = familyMembers.filter((member) => {
+    if (!member.weddingDate) return false;
+    const weddingDate = dayjs(member.weddingDate);
+    return (
+      weddingDate.month() === today.month() && // Ensure the month matches
+      weddingDate.date() >= startOfWeek.date() &&
+      weddingDate.date() <= endOfWeek.date()
+    );
+  });
+
+  return { birthdays, anniversaries };
+}
+
+
+/**
  * Sends celebrant reminder emails to recipients.
  * 
  * @param {Array} recipients - List of recipients.

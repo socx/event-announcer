@@ -40,3 +40,17 @@ export const CELEBRANT_REMINDER_WHATSAPP_MESSAGE = `Hi [[RECIPIENT_FIRSTNAME]],
   Birthdays🎉:  [[BIRTHDAY_CELEBRANTS]]
   Anniversaries🎊: [[ANNIVERSARY_CELEBRANTS]]`;
   
+
+  export const COMPANY_EVENT_REMINDER_EMAIL_MESSAGE = `<div>
+  <h1> COMPANY EVENT REMINDER 🗣️</h1>
+  <p>Hi [[RECIPIENT_FIRSTNAME]], 👋🏽</p>
+  <p>This is a friendly reminder for company events due in the next 30 days.</p>
+  <h2>Upcoming Due Accounts</h2>
+  <p>[[ACCOUNT_DUE_COMPANIES]]</p>
+  <p></p>
+  <h2>Upcoming Due Returns</h2>
+  <p>[[RETURNS_DUE_COMPANIES]]</p>
+  <p></p>
+  <p>Best regards,</p>
+  <p>[[APP_NAME]] Team</p>
+</div>`;

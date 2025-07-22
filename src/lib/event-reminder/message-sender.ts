@@ -7,7 +7,7 @@ import nodeCron from 'node-cron';
 import nodemailer from 'nodemailer';
 import path from 'path';
 
-import { CELEBRANT_REMINDER_EMAIL_MESSAGE } from './messageTemplates';
+import { CELEBRANT_REMINDER_EMAIL_MESSAGE, COMPANY_EVENT_REMINDER_EMAIL_MESSAGE } from './messageTemplates';
 
 
 dotenv.config();
@@ -19,6 +19,14 @@ export interface Recipient {
   mobileNo: string;
   email: string;
   familyId: string;
+}
+
+export interface CompanyOfficer {
+  id: string;
+  firstname: string;
+  lastname: string;
+  mobileNo: string;
+  email: string;
 }
 
 export interface FamilyMember {
@@ -45,6 +53,27 @@ export interface Celebrant {
 export interface Celebrants {
   birthdays: FamilyMember[];
   anniversaries: FamilyMember[];
+}
+
+export interface CompaniesWithEvents {
+  accountsDue: Company[];
+  returnsDue: Company[];
+}
+
+export interface Company {
+  id: string;
+  companyName: string;
+  companyNumber: string;
+  companyType: string;
+  incorporationDate: Date;
+  companyStatus: string;
+  registeredAddress: string;
+  accountsDueDate: Date;
+  accountsNextDueDate: Date;
+  accountsLastMadeUpDate: Date;
+  returnsDueDate: Date;
+  returnsNextDueDate: Date;
+  returnsLastMadeUpDate: Date;
 }
 
 export const readFamilyMembersFromCSV = (filePath: string): Promise<FamilyMember[]> => {
@@ -181,33 +210,136 @@ export const sendCelebrantReminderEmails = async (
       console.error(`Failed to send celebrant reminder email to ${recipient.firstname} (${recipient.email}):`, error);
     }
   }
-//   const celebrantList = birthdays.map(b => `${b.firstname} ${b.lastname}`).join(', ');
-//   const anniversaryList = anniversaries.map(a => `${a.firstname} ${a.lastname}`).join(', ');
-//   const celebrantMessage = `
-//   <div>
-//     <h1>Today's Celebrations 🎉</h1>
-//     `+ (birthdays.length > 0 ? `<h2>Birthdays: ${celebrantList}</h2>` : '') +
-//     `+ (anniversaries.length > 0 ? `<h2>Anniversaries: ${anniversaryList}</h2>` : '') + `
-//     <p>Best regards,</p>
-//     <p>${process.env.APP_NAME} Team</p>
-//   </div>
-//   `;
-// import { CELEBRANT_REMINDER_EMAIL_MESSAGE } from './messageTemplates';
-//   const emailPromises = recipients.map(async (recipient) => {
-//     const emailContent = CELEBRANT_REMINDER_EMAIL_MESSAGE
-//       .replace('[[RECIPIENT_FIRSTNAME]]', recipient.firstname)
-//       .replace('[[BIRTHDAY_CELEBRANTS]]', celebrantList)
-//       .replace('[[ANNIVERSARY_CELEBRANTS]]', anniversaryList)
-//       .replace('[[APP_NAME]]', process.env.APP_NAME || 'Event Reminder App');
-//     try {
-//       await sendEmail(recipient.email, 'Celebration Reminder', emailContent);
-//       console.log(`Email sent to ${recipient.firstname} ${recipient.lastname}`);
-//     } catch (error) {
-//       console.error(`Failed to send email to ${recipient.firstname} ${recipient.lastname}: ${error}`);
-//     }
-//   });
-//   await Promise.all(emailPromises);
-//   console.log(`Celebrant reminder emails sent to ${recipients.length} recipients.`);
+};
+
+export const readCompaniesFromCSV = (filePath: string): Promise<Company[]> => {
+  try {
+    return new Promise((resolve, reject) => {
+      const companies: Company[] = [];
+      fs.createReadStream(path.resolve(__dirname, filePath))
+      .pipe(csvParser())
+      .on('data', (data: any) => {
+        companies.push({
+          id: data.id,
+          companyName: data.company_name,
+          companyNumber: data.company_number,
+          companyType: data.company_type,
+          incorporationDate: new Date(data.incorporation_date),
+          companyStatus: data.company_status,
+          registeredAddress: data.registered_address,
+          accountsDueDate: new Date(data.accounts_due_date),
+          accountsNextDueDate: new Date(data.accounts_next_due_date),
+          accountsLastMadeUpDate: new Date(data.accounts_last_made_up_date),
+          returnsDueDate: new Date(data.returns_due_date),
+          returnsNextDueDate: new Date(data.returns_next_due_date),
+          returnsLastMadeUpDate: new Date(data.returns_last_made_up_date),
+        });
+      })
+      .on('end', () => {
+        resolve(companies);
+      })
+      .on('error', (error) => {
+        reject(error);
+      });
+    });
+  }  catch (error) {
+    console.error(`Error reading companies from CSV: ${error}`);
+    throw error;
+  }
+}
+
+export const readCompanyOfficersFromCSV = (filePath: string): Promise<CompanyOfficer[]> => {
+  try {
+    return new Promise((resolve, reject) => {
+      const companyOfficers: CompanyOfficer[] = [];
+      fs.createReadStream(path.resolve(__dirname, filePath))
+        .pipe(csvParser())
+        .on('data', (data: any) => {
+          companyOfficers.push({
+            id: data.id,
+            firstname: data.firstname,
+            lastname: data.lastname,
+            mobileNo: data.mobileNo,
+            email: data.email,
+          });
+        })
+        .on('end', () => {
+          resolve(companyOfficers);
+        })
+        .on('error', (error) => {
+          reject(error);
+        });
+    });
+  } catch (error) {
+    console.error(`Error reading company officers from CSV: ${error}`);
+    throw error;
+  }
+}
+
+export const getUpcomingEvents = (companies: Company[]): CompaniesWithEvents => {
+  const thirtyDaysTime = dayjs().add(30, 'day');
+
+  let accountsDue: Company[] = [];
+  let returnsDue: Company[] = [];
+
+  if (!companies || companies.length === 0) {
+    console.warn('No companies have upcoming.');
+    return { accountsDue, returnsDue };
+  }
+
+  accountsDue = companies.filter(
+    (company: Company) =>
+      company.accountsDueDate &&
+        dayjs(company.accountsDueDate).format('YYYY-MM-DD') === thirtyDaysTime.format('YYYY-MM-DD')
+  );
+
+  returnsDue = companies.filter(
+    (company: Company) =>
+      company.returnsDueDate &&
+        company.returnsDueDate &&
+          dayjs(company.returnsDueDate).format('YYYY-MM-DD') === thirtyDaysTime.format('YYYY-MM-DD')
+  );
+
+  return { accountsDue, returnsDue };
+}
+
+export const sendCompanyEventReminderEmails = async (
+  companyOfficers: CompanyOfficer[],
+  accountsDue: Company[],
+  returnsDue: Company[]
+) => {
+  if (accountsDue.length === 0 && returnsDue.length === 0) {
+    console.log("No upcoming company events to notify today.");
+    return;
+  }
+
+  if (companyOfficers.length === 0) {
+    console.log('No company officers found to send reminders.');
+    return;
+  }
+
+  for (const companyOfficer of companyOfficers) {
+    const accountsDueCompanies: string = accountsDue.map(
+      (accountsDueCo: Company) => `${accountsDueCo.companyName}(${accountsDueCo.companyNumber})`
+    ).join(', ') || 'None';
+
+    const returnsDueCompanies: string = returnsDue.map(
+      (returnsDueCo: Company) => `${returnsDueCo.companyName}(${returnsDueCo.companyNumber})`
+    ).join(', ') || 'None';
+
+    const emailMessage = COMPANY_EVENT_REMINDER_EMAIL_MESSAGE
+      .replace('[[RECIPIENT_FIRSTNAME]]', companyOfficer.firstname)
+      .replace('[[ACCOUNT_DUE_COMPANIES]]', accountsDueCompanies)
+      .replace('[[RETURNS_DUE_COMPANIES]]', returnsDueCompanies)
+      .replace('[[APP_NAME]]', process.env.APP_NAME || 'Event Announcer');
+
+    try {
+      await sendEmail(companyOfficer.email, "Upcoming Company event Reminder 🗣️", emailMessage);
+      console.log(`Company event reminder email sent to ${companyOfficer.firstname} (${companyOfficer.email})`);
+    } catch (error) {
+      console.error(`Failed to send reminder email to ${companyOfficer.firstname} (${companyOfficer.email}):`, error);
+    }
+  }
 };
 
 export const sendEmail = async (to: string, subject: string, html: string) => {

@@ -9,7 +9,7 @@
 
 import advancedFormat from 'dayjs/plugin/advancedFormat.js';
 import axios from 'axios';
-import chalk from 'chalk';
+import * as chalk from 'chalk';
 import csvParser from 'csv-parser';
 import dayjs from 'dayjs';
 import dotenv from 'dotenv';
@@ -31,7 +31,7 @@ dayjs.extend(advancedFormat);
 
 
 // Read family members data from CSV
-async function readFamilyMembersFromCSV(filePath) {
+export async function readFamilyMembersFromCSV(filePath) {
   const familyMembers = [];
 
   // id,firstname,middlename,lastname,birthDate,gender,parents,weddingDate,spouses,deathDate
@@ -71,7 +71,7 @@ async function readFamilyMembersFromCSV(filePath) {
 }
 
 // Read recipients data from CSV
-async function readRecipientsFromCSV(filePath) {
+export async function readRecipientsFromCSV(filePath) {
   const recipients = [];
 
   try {
@@ -90,16 +90,19 @@ async function readRecipientsFromCSV(filePath) {
           });
         })
         .on('end', () => {
-          console.log(chalk.green(`Successfully read ${recipients.length} recipients from CSV.`));
+          // console.log(chalk.green(`Successfully read ${recipients.length} recipients from CSV.`));
+          console.log(`Successfully read ${recipients.length} recipients from CSV.`);
           resolve();
         })
         .on('error', (error) => {
-          console.error(chalk.red('Error reading recipients CSV file:'), error);
+          // console.error(chalk.red('Error reading recipients CSV file:'), error);
+          console.error('Error reading recipients CSV file:', error);
           reject(error);
         });
     });
   } catch (error) {
-    console.error(chalk.red('Failed to read recipients from CSV:'), error);
+    // console.error(chalk.red('Failed to read recipients from CSV:'), error);
+    console.error('Failed to read recipients from CSV:', error);
   }
 
   return recipients;
@@ -112,7 +115,7 @@ async function readRecipientsFromCSV(filePath) {
  * @param {Array} familyMembers - List of family members with birthDate and weddingDate fields.
  * @returns {Object} - An object containing two arrays: birthdays and anniversaries.
  */
-function getTodayCelebrants(familyMembers) {
+export function getTodayCelebrants(familyMembers) {
   const today = dayjs(); // Get today's date
   const todayDay = today.date(); // Day of the month
   const todayMonth = today.month(); // Month (0-indexed)

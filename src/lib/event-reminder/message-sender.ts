@@ -276,7 +276,7 @@ export const readCompanyOfficersFromCSV = (filePath: string): Promise<CompanyOff
   }
 }
 
-export const getUpcomingEvents = (companies: Company[]): CompaniesWithEvents => {
+export const getUpcomingEvents = (companies: Company[]): Promise<CompaniesWithEvents> => {
   const thirtyDaysTime = dayjs().add(30, 'day');
 
   let accountsDue: Company[] = [];
@@ -284,7 +284,7 @@ export const getUpcomingEvents = (companies: Company[]): CompaniesWithEvents => 
 
   if (!companies || companies.length === 0) {
     console.warn('No companies have upcoming.');
-    return { accountsDue, returnsDue };
+    return new Promise((resolve, reject) => resolve({ accountsDue, returnsDue }));
   }
 
   accountsDue = companies.filter(
@@ -300,14 +300,14 @@ export const getUpcomingEvents = (companies: Company[]): CompaniesWithEvents => 
           dayjs(company.returnsDueDate).format('YYYY-MM-DD') === thirtyDaysTime.format('YYYY-MM-DD')
   );
 
-  return { accountsDue, returnsDue };
+  return new Promise((resolve, reject) => resolve({ accountsDue, returnsDue }));
 }
 
 export const sendCompanyEventReminderEmails = async (
   companyOfficers: CompanyOfficer[],
   accountsDue: Company[],
   returnsDue: Company[]
-) => {
+) : Promise<void> => {
   if (accountsDue.length === 0 && returnsDue.length === 0) {
     console.log("No upcoming company events to notify today.");
     return;

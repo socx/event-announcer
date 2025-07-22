@@ -7,7 +7,7 @@ import {
 } from "./message-sender";
 
 
-async function sendReminders() {
+export async function sendReminders(): Promise<void> {
   console.log();
   console.log(`Running scheduled job at : ${new Date().toISOString()}`);
   
@@ -18,7 +18,7 @@ async function sendReminders() {
     console.log();
     
     const companies = await readCompaniesFromCSV('data/companies.csv');
-    const { accountsDue, returnsDue } = getUpcomingEvents(companies);
+    const { accountsDue, returnsDue } = await getUpcomingEvents(companies);
     console.log('Upcoming Due Accounts:', accountsDue.map((company) => `${company.companyName}(${company.companyNumber})`));
     console.log('Upcoming Due Returns:', returnsDue.map((company) => `${company.companyName}(${company.companyNumber})`));
     console.log();

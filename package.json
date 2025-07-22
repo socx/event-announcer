@@ -7,7 +7,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "lint": "eslint",
-    "event-reminder-cron": "npx ts-node src/lib/event-reminder/index.ts",
+    "event-reminder-cron": "npx ts-node src/lib/event-reminder/event-reminder.ts",
     "company-reminder-cron": "npx ts-node src/lib/event-reminder/company-reminder.ts"
   },
   "keywords": [],

@@ -94,8 +94,8 @@ describe('sendReminders', () => {
     // Check console logs
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Running scheduled job at'));
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Recipients: John, Jane'));
-    // expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Upcoming Due Accounts: ABC Ltd(12345), XYZ Ltd(67890)'));
-    // expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Upcoming Due Returns: XYZ Ltd(67890)'));
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Upcoming Due Accounts: ABC Ltd - 12345,XYZ Ltd - 67890'));
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Upcoming Due Returns: XYZ Ltd - 67890'));
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('ALL DONE at'));
 
     // Restore console.log

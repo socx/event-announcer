@@ -36,9 +36,9 @@ export interface FamilyMember {
   lastname: string;
   gender: string;
   parents: string[];
-  birthDate: Date;
-  weddingDate: Date;
-  deathDate: Date;
+  birthDate?: Date;
+  weddingDate?: Date;
+  deathDate?: Date;
   spouses: string[];
 }
 
@@ -164,6 +164,33 @@ export const getTodayCelebrants = (familyMembers: FamilyMember[]): Celebrants =>
       member.weddingDate &&
       dayjs(member.weddingDate).date() === todayDay &&
       dayjs(member.weddingDate).month() === todayMonth
+  );
+
+  return { birthdays, anniversaries };
+}
+
+export const getMonthCelebrants = (familyMembers: FamilyMember[]): Celebrants => {
+  const today = dayjs();
+  const currentMonth = today.month();
+
+  let birthdays: FamilyMember[] = [];
+  let anniversaries: FamilyMember[] = [];
+
+  if (!familyMembers || familyMembers.length === 0) {
+    console.warn('No family members provided for celebrant lookup.');
+    return { birthdays, anniversaries };
+  }
+
+  birthdays = familyMembers.filter(
+    (member: FamilyMember) =>
+      member.birthDate &&
+      dayjs(member.birthDate).month() === currentMonth
+  );
+
+  anniversaries = familyMembers.filter(
+    (member) =>
+      member.weddingDate &&
+      dayjs(member.weddingDate).month() === currentMonth
   );
 
   return { birthdays, anniversaries };

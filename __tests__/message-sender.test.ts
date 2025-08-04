@@ -1,8 +1,11 @@
 import {
+  Company,
   FamilyMember,
   getMonthCelebrants,
   getTodayCelebrants,
+  getUpcomingEvents,
 } from '../src/lib/event-reminder/message-sender';
+import dayjs from 'dayjs';
 
 
 describe('getMonthCelebrants', () => {
@@ -82,7 +85,6 @@ describe('getMonthCelebrants', () => {
   });
 });
 
-
 describe('getTodayCelebrants', () => {
   it('should return empty arrays when no family members are provided', () => {
     const familyMembers: FamilyMember[] = [];
@@ -161,5 +163,158 @@ describe('getTodayCelebrants', () => {
 
     expect(birthdays).toEqual([]);
     expect(anniversaries).toEqual([]);
+  });
+});
+
+describe('getUpcomingEvents', () => {
+  it('should return empty arrays when no companies are provided', async () => {
+    const companies: Company[] = [];
+    const { accountsDue, returnsDue } = await getUpcomingEvents(companies);
+
+    expect(accountsDue).toEqual([]);
+    expect(returnsDue).toEqual([]);
+  });
+
+  it('should return empty arrays when no companies have upcoming events', async () => {
+    const companies: Company[] = [
+      {
+        id: '1',
+        companyName: 'ABC Ltd',
+        companyNumber: '12345',
+        companyType: 'Private',
+        incorporationDate: new Date('2020-01-01'),
+        companyStatus: 'Active',
+        registeredAddress: '123 ABC Street',
+        accountsDueDate: new Date('2025-07-01'),
+        accountsNextDueDate: new Date('2025-07-01'),
+        accountsLastMadeUpDate: new Date('2024-07-01'),
+        returnsDueDate: new Date('2025-08-01'),
+        returnsNextDueDate: new Date('2025-08-01'),
+        returnsLastMadeUpDate: new Date('2024-08-01'),
+      },
+    ];
+    const { accountsDue, returnsDue } = await getUpcomingEvents(companies);
+
+    expect(accountsDue).toEqual([]);
+    expect(returnsDue).toEqual([]);
+  });
+
+  it('should return companies with accounts due in 30 days', async () => {
+    const thirtyDaysFromNow = dayjs().add(30, 'day').toDate();
+
+    const companies: Company[] = [
+      {
+        id: '1',
+        companyName: 'ABC Ltd',
+        companyNumber: '12345',
+        companyType: 'Private',
+        incorporationDate: new Date('2020-01-01'),
+        companyStatus: 'Active',
+        registeredAddress: '123 ABC Street',
+        accountsDueDate: thirtyDaysFromNow,
+        accountsNextDueDate: new Date('2025-07-01'),
+        accountsLastMadeUpDate: new Date('2024-07-01'),
+        returnsDueDate: new Date('2025-08-01'),
+        returnsNextDueDate: new Date('2025-08-01'),
+        returnsLastMadeUpDate: new Date('2024-08-01'),
+      },
+    ];
+    const { accountsDue, returnsDue } = await getUpcomingEvents(companies);
+
+    expect(accountsDue).toEqual([companies[0]]);
+    expect(returnsDue).toEqual([]);
+  });
+
+  it('should return companies with returns due in 30 days', async () => {
+    const thirtyDaysFromNow = dayjs().add(30, 'day').toDate();
+
+    const companies: Company[] = [
+      {
+        id: '1',
+        companyName: 'ABC Ltd',
+        companyNumber: '12345',
+        companyType: 'Private',
+        incorporationDate: new Date('2020-01-01'),
+        companyStatus: 'Active',
+        registeredAddress: '123 ABC Street',
+        accountsDueDate: new Date('2025-07-01'),
+        accountsNextDueDate: new Date('2025-07-01'),
+        accountsLastMadeUpDate: new Date('2024-07-01'),
+        returnsDueDate: thirtyDaysFromNow,
+        returnsNextDueDate: new Date('2025-08-01'),
+        returnsLastMadeUpDate: new Date('2024-08-01'),
+      },
+    ];
+    const { accountsDue, returnsDue } = await getUpcomingEvents(companies);
+
+    expect(accountsDue).toEqual([]);
+    expect(returnsDue).toEqual([companies[0]]);
+  });
+
+  it('should return companies with both accounts and returns due in 30 days', async () => {
+    const thirtyDaysFromNow = dayjs().add(30, 'day').toDate();
+
+    const companies: Company[] = [
+      {
+        id: '1',
+        companyName: 'ABC Ltd',
+        companyNumber: '12345',
+        companyType: 'Private',
+        incorporationDate: new Date('2020-01-01'),
+        companyStatus: 'Active',
+        registeredAddress: '123 ABC Street',
+        accountsDueDate: thirtyDaysFromNow,
+        accountsNextDueDate: new Date('2025-07-01'),
+        accountsLastMadeUpDate: new Date('2024-07-01'),
+        returnsDueDate: thirtyDaysFromNow,
+        returnsNextDueDate: new Date('2025-08-01'),
+        returnsLastMadeUpDate: new Date('2024-08-01'),
+      },
+    ];
+    const { accountsDue, returnsDue } = await getUpcomingEvents(companies);
+
+    expect(accountsDue).toEqual([companies[0]]);
+    expect(returnsDue).toEqual([companies[0]]);
+  });
+
+  it('should exclude companies with accounts or returns due outside 30 days', async () => {
+    const thirtyDaysFromNow = dayjs().add(30, 'day').toDate();
+
+    const companies: Company[] = [
+      {
+        id: '1',
+        companyName: 'ABC Ltd',
+        companyNumber: '12345',
+        companyType: 'Private',
+        incorporationDate: new Date('2020-01-01'),
+        companyStatus: 'Active',
+        registeredAddress: '123 ABC Street',
+        accountsDueDate: new Date('2025-07-01'),
+        accountsNextDueDate: new Date('2025-07-01'),
+        accountsLastMadeUpDate: new Date('2024-07-01'),
+        returnsDueDate: new Date('2025-08-01'),
+        returnsNextDueDate: new Date('2025-08-01'),
+        returnsLastMadeUpDate: new Date('2024-08-01'),
+      },
+      {
+        id: '2',
+        companyName: 'XYZ Ltd',
+        companyNumber: '67890',
+        companyType: 'Public',
+        incorporationDate: new Date('2019-05-15'),
+        companyStatus: 'Active',
+        registeredAddress: '456 XYZ Avenue',
+        accountsDueDate: thirtyDaysFromNow,
+        accountsNextDueDate: new Date('2025-07-01'),
+        accountsLastMadeUpDate: new Date('2024-07-01'),
+        returnsDueDate: thirtyDaysFromNow,
+        returnsNextDueDate: new Date('2025-08-01'),
+        returnsLastMadeUpDate: new Date('2024-08-01'),
+      },
+    ];
+    const { accountsDue, returnsDue } = await getUpcomingEvents(companies);
+
+    expect(accountsDue).toEqual([companies[1]]);
+    expect(returnsDue).toEqual([companies[1]]);
   });
 });

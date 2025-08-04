@@ -4,8 +4,12 @@ import {
   getMonthCelebrants,
   getTodayCelebrants,
   getUpcomingEvents,
+  sendEmail,
 } from '../src/lib/event-reminder/message-sender';
 import dayjs from 'dayjs';
+import nodemailer from 'nodemailer';
+
+jest.mock('nodemailer');
 
 
 describe('getMonthCelebrants', () => {
@@ -316,5 +320,128 @@ describe('getUpcomingEvents', () => {
 
     expect(accountsDue).toEqual([companies[1]]);
     expect(returnsDue).toEqual([companies[1]]);
+  });
+});
+
+describe('sendEmail', () => {
+  const mockSendMail = jest.fn();
+  const mockCreateTransport = nodemailer.createTransport as jest.Mock;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateTransport.mockReturnValue({ sendMail: mockSendMail });
+  });
+
+  it('should send an email successfully', async () => {
+    mockSendMail.mockResolvedValueOnce('Email sent');
+
+    process.env.SMTP_HOST = 'smtp.example.com';
+    process.env.SMTP_PORT = '587';
+    process.env.SMTP_SECURE = 'false';
+    process.env.SMTP_USER = 'user@example.com';
+    process.env.SMTP_PASSWORD = 'password';
+    process.env.APP_NAME = 'Event Announcer';
+
+    await sendEmail('recipient@example.com', 'Test Subject', '<p>Test Body</p>');
+
+    expect(mockCreateTransport).toHaveBeenCalledWith({
+      host: 'smtp.example.com',
+      port: 587,
+      secure: false,
+      auth: {
+        user: 'user@example.com',
+        pass: 'password',
+      },
+    });
+
+    expect(mockSendMail).toHaveBeenCalledWith({
+      from: '"Event Announcer" <user@example.com>',
+      to: 'recipient@example.com',
+      subject: 'Test Subject',
+      html: '<p>Test Body</p>',
+    });
+  });
+
+  it('should throw an error if environment variables are missing', async () => {
+    delete process.env.SMTP_HOST;
+    delete process.env.SMTP_PORT;
+    delete process.env.SMTP_USER;
+    delete process.env.SMTP_PASSWORD;
+
+    await expect(
+      sendEmail('recipient@example.com', 'Test Subject', '<p>Test Body</p>')
+    ).rejects.toThrow('Email configuration is not properly set in environment variables.');
+  });
+
+  it('should throw an error if "to" email address is invalid', async () => {
+    process.env.SMTP_HOST = 'smtp.example.com';
+    process.env.SMTP_PORT = '587';
+    process.env.SMTP_SECURE = 'false';
+    process.env.SMTP_USER = 'user@example.com';
+    process.env.SMTP_PASSWORD = 'password';
+    process.env.APP_NAME = 'Event Announcer';
+
+    await expect(
+      sendEmail('invalid-email', 'Test Subject', '<p>Test Body</p>')
+    ).rejects.toThrow('Invalid email address: invalid-email');
+  });
+
+  it('should throw an error if "to", "subject", or "html" is missing', async () => {
+    process.env.SMTP_HOST = 'smtp.example.com';
+    process.env.SMTP_PORT = '587';
+    process.env.SMTP_SECURE = 'false';
+    process.env.SMTP_USER = 'user@example.com';
+    process.env.SMTP_PASSWORD = 'password';
+    process.env.APP_NAME = 'Event Announcer';
+
+    await expect(sendEmail('', 'Test Subject', '<p>Test Body</p>')).rejects.toThrow(
+      'Email parameters (to, subject, html) must be provided.'
+    );
+
+    await expect(sendEmail('recipient@example.com', '', '<p>Test Body</p>')).rejects.toThrow(
+      'Email parameters (to, subject, html) must be provided.'
+    );
+
+    await expect(sendEmail('recipient@example.com', 'Test Subject', '')).rejects.toThrow(
+      'Email parameters (to, subject, html) must be provided.'
+    );
+  });
+
+  it('should throw an error if "subject" or "html" is not a string', async () => {
+    process.env.SMTP_HOST = 'smtp.example.com';
+    process.env.SMTP_PORT = '587';
+    process.env.SMTP_SECURE = 'false';
+    process.env.SMTP_USER = 'user@example.com';
+    process.env.SMTP_PASSWORD = 'password';
+    process.env.APP_NAME = 'Event Announcer';
+
+    await expect(
+      sendEmail('recipient@example.com', 123 as unknown as string, '<p>Test Body</p>')
+    ).rejects.toThrow('Subject and HTML content must be strings.');
+
+    await expect(
+      sendEmail('recipient@example.com', 'Test Subject', 123 as unknown as string)
+    ).rejects.toThrow('Subject and HTML content must be strings.');
+  });
+
+  it('should log an error if sending the email fails', async () => {
+    mockSendMail.mockRejectedValueOnce(new Error('SMTP error'));
+
+    process.env.SMTP_HOST = 'smtp.example.com';
+    process.env.SMTP_PORT = '587';
+    process.env.SMTP_SECURE = 'false';
+    process.env.SMTP_USER = 'user@example.com';
+    process.env.SMTP_PASSWORD = 'password';
+    process.env.APP_NAME = 'Event Announcer';
+
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await sendEmail('recipient@example.com', 'Test Subject', '<p>Test Body</p>');
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'Error sending email to recipient@example.com: Error: SMTP error'
+    );
+
+    consoleErrorSpy.mockRestore();
   });
 });

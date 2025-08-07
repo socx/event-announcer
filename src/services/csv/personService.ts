@@ -29,6 +29,17 @@ export const createPerson = async (person: Person) => {
   }
 }
 
+export const updatePerson = async (updatedPerson: Person) => {
+  try {
+    const csvPath = path.join(__dirname, '../../lib/event-reminder/data/family_members.csv');
+    await updatePersonInCSV(csvPath, updatedPerson);
+    return updatedPerson;
+  } catch (error) {
+    console.error(`Error creating person: ${error}`);
+    throw error;
+  }
+}
+
 export const readPeopleFromCSV = (filePath: string): Promise<Person[]> => {
   try {
     return new Promise((resolve, reject) => {
@@ -76,7 +87,7 @@ export const insertPersonToCSV = (filePath: string, data: Person) => {
     parents,
   } = data;
   const line = `${id},${firstname},${middlename},${lastname},${birthDate},${gender},${parents},${weddingDate},${spouses},${deathDate}\n`;
-console.log(`Inserting line: ${line}, into ${filePath}`); // Debugging line
+
   // Check if file exists
   if (!fs.existsSync(filePath)) {
     const headers = 'id,firstname,middlename,lastname,birthDate,gender,parents,weddingDate,spouses,deathDate\n';
@@ -85,5 +96,68 @@ console.log(`Inserting line: ${line}, into ${filePath}`); // Debugging line
   } else {
     fs.appendFileSync(filePath, line, 'utf8');
     console.log('Line appended to existing CSV file.');
+  }
+}
+
+export const updatePersonInCSV = async (filePath: string, updatedData: Person): Promise<Person>  => {
+  try {
+    return new Promise((resolve, reject) => {
+      if (!updatedData || !updatedData.id) {
+        console.log('CSV file does not exist.');
+        reject(new Error('Updated data must include an id.'));
+      }
+      if (!fs.existsSync(filePath)) {
+        console.log('CSV file does not exist.');
+        reject(new Error('Error updating data'));
+      }
+      const csvContent = fs.readFileSync(filePath, 'utf8');
+      const lines = csvContent.trim().split('\n');
+    
+      const headers = lines[0].split(',');
+      const updatedLines = [lines[0]]; // Start with headers
+    
+      let updated = false;
+    
+      for (let i = 1; i < lines.length; i++) {
+        const row = lines[i].split(',');
+        const rowData = Object.fromEntries(headers.map((h, idx) => [h.trim(), row[idx].trim()]));
+    
+        if (rowData.id === updatedData.id) {
+          // Replace with updated data
+          const {
+            id,
+            firstname,
+            middlename,
+            lastname,
+            gender,
+            birthDate,
+            weddingDate,
+            deathDate,
+            spouses,
+            parents,
+          } = updatedData;
+    
+          const newLine = `${id},${firstname},${middlename},${lastname},${birthDate},${gender},${parents},${weddingDate},${spouses},${deathDate}\n`;
+        
+          updatedLines.push(newLine);
+          updated = true;
+        } else {
+          updatedLines.push(lines[i]);
+        }
+      }
+      
+      if (updated) {
+        fs.writeFileSync(filePath, updatedLines.join('\n') + '\n', 'utf8');
+        console.log(`Line with id=${updatedData.id} updated.`);
+        resolve(updatedData)
+      } else {
+        console.log(`No data found with id=${updatedData.id} in CSV.`);
+        reject(new Error(`No data found with id=${updatedData.id}.`));
+      }
+    });
+    
+  } catch (error) {
+    console.error(`Error updating  data: ${error}`);
+    throw error;
   }
 }

@@ -1,9 +1,10 @@
 import { jest } from '@jest/globals';
-import { sendMessages } from '../src/lib/event-reminder/event-reminder';
+import { printMonthCelebrants, sendMessages } from '../src/lib/event-reminder/event-reminder';
 import {
   readRecipientsFromCSV,
   readFamilyMembersFromCSV,
   getTodayCelebrants,
+  getMonthCelebrants,
   sendCelebrantReminderEmails,
   FamilyMember,
   Recipient,
@@ -135,6 +136,128 @@ describe('sendMessages', () => {
     expect(consoleLogSpy).toHaveBeenCalledWith(mockError);
 
     // Restore console.log
+    consoleLogSpy.mockRestore();
+  });
+});
+
+describe('printMonthCelebrants', () => {
+
+  jest.mock('../src/lib/event-reminder/message-sender', () => ({
+    readFamilyMembersFromCSV: jest.fn(),
+    getMonthCelebrants: jest.fn(),
+  }));
+
+  const mockFamilyMembers : FamilyMember[] = [
+    { 
+      id: '1', 
+      firstname: 'John', 
+      middlename: 'Dave', 
+      lastname: 'Doe', 
+      gender: 'Active', 
+      parents: ['4', '5'], 
+      birthDate: new Date('2020-04-01'), 
+      weddingDate: new Date('2025-07-30'), 
+      deathDate: new Date('2025-08-15'),
+      spouses: ['2'], 
+    },
+    { 
+      id: '2', 
+      firstname: 'Jane', 
+      middlename: 'Parker', 
+      lastname: 'Smith', 
+      gender: 'Active', 
+      parents: ['6', '7'], 
+      birthDate: new Date('2020-01-01'), 
+      weddingDate: new Date('2025-07-30'), 
+      deathDate: new Date('2025-08-15'),
+      spouses: ['1'], 
+    },
+  ];
+  const mockCelebrants = {
+    birthdays: [
+      { 
+        id: '9', 
+        firstname: 'John', 
+        middlename: 'Dave', 
+        lastname: 'Doe', 
+        gender: 'Active', 
+        parents: ['4', '5'], 
+        birthDate: new Date(`${new Date().getFullYear()}-${new Date().getMonth()}-01`), 
+        weddingDate: new Date(`${new Date().getFullYear()}-${new Date().getMonth()}-01`), 
+        deathDate: new Date('2025-08-15'),
+        spouses: ['10'], 
+      }
+    ],
+    anniversaries: [
+      { 
+        id: '9', 
+        firstname: 'Jane', 
+        middlename: 'Parker', 
+        lastname: 'Smith', 
+        gender: 'Active', 
+        parents: ['6', '7'], 
+        birthDate: new Date(`${new Date().getFullYear()}-${new Date().getMonth()}-01`), 
+        weddingDate: new Date(`${new Date().getFullYear()}-${new Date().getMonth()}-01`),
+        deathDate: new Date('2025-08-15'),
+        spouses: ['12'], 
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // it('should log month celebrants successfully', async () => {
+  //   (readFamilyMembersFromCSV as jest.MockedFunction<typeof readFamilyMembersFromCSV>).mockResolvedValue(mockFamilyMembers);
+  //   (getMonthCelebrants as jest.Mock).mockReturnValue(mockCelebrants);
+
+  //   const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+  //   await printMonthCelebrants();
+
+  //   expect(readFamilyMembersFromCSV).toHaveBeenCalledWith('data/family_members.csv');
+  //   expect(getMonthCelebrants).toHaveBeenCalledWith(mockFamilyMembers);
+
+  //   expect(consoleLogSpy).toHaveBeenCalledWith(
+  //     `This Month\'s Birthdays: John Doe`
+  //   );
+  //   expect(consoleLogSpy).toHaveBeenCalledWith(
+  //     `This Month\'s Anniversaries: Jane Smith`
+  //   );
+
+  //   consoleLogSpy.mockRestore();
+  // });
+
+  // it('should log empty lists when there are no celebrants', async () => {
+  //   (readFamilyMembersFromCSV as jest.MockedFunction<typeof readFamilyMembersFromCSV>).mockResolvedValue([]);
+  //   (getMonthCelebrants as jest.Mock).mockReturnValue({ birthdays: [], anniversaries: [] });
+
+  //   const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+  //   await printMonthCelebrants();
+
+  //   expect(readFamilyMembersFromCSV).toHaveBeenCalledWith('data/family_members.csv');
+  //   expect(getMonthCelebrants).toHaveBeenCalledWith([]);
+
+  //   expect(consoleLogSpy).toHaveBeenCalledWith(`This Month's Birthdays: `);
+  //   expect(consoleLogSpy).toHaveBeenCalledWith(`This Month's Anniversaries: `);
+
+  //   consoleLogSpy.mockRestore();
+  // });
+
+  it('should handle errors gracefully', async () => {
+    const mockError = new Error('Test error');
+    (readFamilyMembersFromCSV as jest.MockedFunction<typeof readFamilyMembersFromCSV>).mockRejectedValue(mockError);
+
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await printMonthCelebrants();
+
+    expect(readFamilyMembersFromCSV).toHaveBeenCalledWith('data/family_members.csv');
+    expect(consoleLogSpy).toHaveBeenCalledWith('Sending Message failed');
+    expect(consoleLogSpy).toHaveBeenCalledWith(mockError);
+
     consoleLogSpy.mockRestore();
   });
 });

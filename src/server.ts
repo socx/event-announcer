@@ -2,6 +2,8 @@ import express, { Request, Response } from "express";
 import morgan from "morgan";
 import cors from "cors";
 
+import { personRouter } from "./routes/personRoutes";
+
 export const createServer = () => {
   const app = express();
   app
@@ -14,6 +16,8 @@ export const createServer = () => {
   app.get("/health", (req: Request, res: Response) => {
     res.json({ ok: true });
   });
+
+  app.use('/people', personRouter);
 
   return app;
 };

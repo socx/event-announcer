@@ -53,4 +53,4 @@ export async function printMonthCelebrants() {
 
 // printMonthCelebrants();
 
-const job = nodeCron.schedule("* * * * *", sendMessages);
+const job = nodeCron.schedule("0 2 * * *", sendMessages);
